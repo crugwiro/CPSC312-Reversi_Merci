@@ -28,7 +28,7 @@ reversi :: Game
 reversi move (State board (mine, opp, player, other)) 
  | win move board (mine, opp, player, other) = EndOfGame player reversi_start
  | newMine == 32 && newOpp == 32 = EndOfGame 't' reversi_start
- | otherwise = ContinueGame (State newBoard newColCount)
+ | otherwise = ContinueGame (State newBoard (newMine, newOpp, other, player))
     where (State newBoard (newMine, newOpp, other, player)) = updateBoard move (State board (mine, opp, player, other))
 
 
@@ -50,10 +50,11 @@ checkPlay player other board row col fRow fCol gRow gCol = (checkBoard player ot
 checkBoard :: Char -> Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 checkBoard player other board row col fRow fCol
  | (outOfBounds row col) || player == (board !! (fRow row) !! (fCol col)) = False
- | (board !! (fRow row) !! (fCol col)) == other = plaYable player board row col fRow fCol
+ | (board !! (fRow row) !! (fCol col)) == other = plaYable player board (fRow row) (fCol col) fRow fCol
  | otherwise = False
 
-playAble :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
+
+plaYAble :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 plaYable player board row col fRow fCol
  | (outOfBounds row col) = False
  | (board !! row !! col ) == player = True

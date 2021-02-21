@@ -4,14 +4,14 @@ module ReversiMerci where
 -- ghci
 -- :load MagicSum
 
-data State = State Board InternalState  -- internal_state available_actions
+data State = State Board (Int,Int, Char, Char)  -- internal_state available_actions
          deriving (Ord, Eq, Show)
 
 data Result = EndOfGame Char State    -- end of game: value, starting state
             | ContinueGame State        -- continue with new state
          deriving (Eq, Show)
 
-type Game = Player -> Action -> State -> Result
+type Game = Action -> State -> Result
 
 type Player = Char
 
@@ -21,30 +21,37 @@ type Player = Char
 data Action = Action (Int, Int)                  -- a move for a player is just an Int
          deriving (Ord,Eq, Show)                 -- a move for a player is just an Int
 type Board = [[Char]]  -- (self,other)
-type InternalState = (Int,Int, Char, Char)
+-- type InternalState = (Int,Int, Char, Char)
 
 
 
 
 reversi :: Game 
-reversi (Action row col) (State board (mine, opp, player, other))
+reversi (Action (row,col)) (State board (mine, opp, player, other))
  | win board mine opp player other = EndOfGame player reversi_start
  | boardFull board && mine == opp = EndOfGame 't' reversi_start
- | otherwise = ContinueGame (State newBoard (newOpp, newMine, other, player))
-    where (State newBoard (newMine, newOpp, player, other)) = updateBoard move (State board (mine, opp, player, other))
+ | otherwise = ContinueGame (updateBoard (row,col) (State board (mine, opp, player, other)))
+
+ -- reversi (a (2,3)) test_end_State  
+ --reversi (a (2,3)) reversi_start 
+
 
 -- updates the board
-updateBoard :: Action -> State -> State
-updateBoard (Action row col) (State board (mine, opp, player, other)) = 
-	let rowToUpdate = board !! row
-	    updatedRow = replaceNth col player rowToUpdate
-	    preUpdateBoard = replaceNth row updatedRow board
-	    updatedBoard = updateBoardWithPlay board row col player other
-	    newMine = count player updatedBoard
-	    newOpp = count other updatedBoard
-	in (State updatedBoard (newOpp, newMine, other, player))
+updateBoard :: (Int, Int) -> State -> State
+updateBoard (row,col) (State board (mine, opp, player, other)) = 
+    let preUpdateBoard = replaceNth1 row col player board 
+        updatedBoard = updateBoardWithPlay preUpdateBoard row col player other
+        (newMine, newOpp) = count updatedBoard
+    in (State updatedBoard (newOpp, newMine, other, player))
 
-updateBoardWithPlay Board -> Int -> Int -> Player -> Player -> Board
+count :: Board -> (Int,Int)
+count board = 
+    let 
+        x_count = foldr (\x y -> (length(filter (\y -> y=='X') x)) + y) 0 board
+        y_count = foldr (\x y -> (length(filter (\y -> y=='O') x)) + y) 0 board
+    in (x_count, y_count)
+
+updateBoardWithPlay :: Board -> Int -> Int -> Player -> Player -> Board
 updateBoardWithPlay board row col player other = 
     let board1 = updateFollowUp board row col player other (\ i -> i) (\ j -> j+1)
         board2 = updateFollowUp board1 row col player other (\ i -> i) (\ j -> j-1)
@@ -54,20 +61,20 @@ updateBoardWithPlay board row col player other =
         board6 = updateFollowUp board5 row col player other (\ i -> i - 1) (\ j -> j + 1)
         board7 = updateFollowUp board6 row col player other (\ i -> i + 1) (\ j -> j - 1)
         board8 = updateFollowUp board7 row col player other (\ i -> i - 1) (\ j -> j - 1)
-    in (Board board8)
+    in (board8)
 
 
 
 
-updateFollowUp Board -> Int -> Int -> Player -> Player -> (Int -> Int) -> Board
-updateFollowUp board row col player other fRow gRow
- | (checkBoard player other board row col fRow fCol) = flip board player row col fRow fCol -- horizontal right
- | otherwise = (Board board)
+updateFollowUp :: Board -> Int -> Int -> Player -> Player -> (Int -> Int) -> (Int -> Int) -> Board
+updateFollowUp board row col player other fRow fCol
+ | (checkBoard player other board row col fRow fCol) = flipMerci board player row col fRow fCol -- horizontal right
+ | otherwise = board
 
-flip :: Board -> Player -> Int -> Int -> (Int -> Int) -> Board
-flip board player row col fRow fCol
- | outOfBounds row col || board !! row !! col == '*' = (Board board)
- | otherwise = flip (replaceNth1 fRow fCol player board)
+flipMerci :: Board -> Player -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Board
+flipMerci board player row col fRow fCol
+ | (isOutOfBound row col) || (board !! row !! col) == '*' = board
+ | otherwise = flipMerci (replaceNth1 row col player board) player (fRow row) (fCol col) fRow fCol
 
 replaceNth1 :: Int -> Int -> a -> [[a]] -> [[a]]
 replaceNth1 _ _ _ [] = []
@@ -82,25 +89,30 @@ replaceNth n newVal (x:xs)
    | otherwise = x:replaceNth (n-1) newVal xs
 
 -- a player wins if they have more points than the other player and neither plauer has any valid moves left
-win :: Board -> Int -> Int -> Bool
+win :: Board -> Int -> Int -> Player -> Player -> Bool
 win board mine opp player other
  | boardFull board && mine > opp = True
- | noValidMoves board boardSpaces player other && noValidMoves board boardSpaces player other && mine > opp = True
+ | noValidMoves board (createCoordinate [0..7] [0..7]) player other && noValidMoves board (createCoordinate [0..7] [0..7]) other player  && mine > opp = True
  | otherwise = False
+ -- win test_end_star 5 4 'X' 'O' 
+
+
 
 -- checks whether a player has any valid moves available on the board
 noValidMoves :: Board -> [(Int, Int)] -> Player -> Player -> Bool
+noValidMoves _ [] _ _ = True
 noValidMoves board (h:t) player other
  | valid h board player other = False
- | otherwise = board player t
+ | otherwise = noValidMoves board t player other
 
 -- checks if a move is valid
 valid :: (Int, Int) -> Board -> Player -> Player -> Bool
 valid (row, col) board player other = 
-	(checkPlay player other board row col (\ i -> i) (\ j -> j+1) (\ i -> i) (\j -> j-1)) || -- check horizontal
-    (checkPlay player other board row col (\ i -> i+1) (\ j -> j) (\ i -> i-1) (\j -> j)) || -- check Vertical 
-    (checkPlay player other board row col (\ i -> i-1) (\ j -> j-1) (\ i -> i+1) (\j -> j+1)) || -- check diagnal up
-    (checkPlay player other board row col (\ i -> i+1) (\ j -> j-1) (\ i -> i-1) (\j -> j+1))  -- check diagnal down
+ ((checkPlay player other board row col (\ i -> i) (\ j -> j+1) (\ i -> i) (\j -> j-1)) || -- check horizontal
+ (checkPlay player other board row col (\ i -> i+1) (\ j -> j) (\ i -> i-1) (\j -> j)) || -- check Vertical 
+ (checkPlay player other board row col (\ i -> i-1) (\ j -> j-1) (\ i -> i+1) (\j -> j+1)) || -- check diagnal up
+ (checkPlay player other board row col (\ i -> i+1) (\ j -> j-1) (\ i -> i-1) (\j -> j+1))) &&  -- check diagnal down
+ (board !! row !! col) == '*'
 
 -- helper for valid
 checkPlay :: Char -> Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> Bool
@@ -109,15 +121,16 @@ checkPlay player other board row col fRow fCol gRow gCol = (checkBoard player ot
 -- helper for checkPlay
 checkBoard :: Char -> Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 checkBoard player other board row col fRow fCol
- | (outOfBounds row col) || player == (board !! (fRow row) !! (fCol col)) = False
- | (board !! (fRow row) !! (fCol col)) == other = plaYable player board (fRow row) (fCol col) fRow fCol
+ | (isOutOfBound row col) || ((isOutOfBound (fRow row) (fCol col)) || player == (board !! (fRow row) !! (fCol col))) = False
+ | ((board !! (fRow row) !! (fCol col)) == other) && not (isOutOfBound (fRow row) (fCol col)) = plaYable player board (fRow row) (fCol col) fRow fCol
  | otherwise = False
 
 
-plaYAble :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
+plaYable :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 plaYable player board row col fRow fCol
- | (outOfBounds row col) = False
- | (board !! row !! col ) == player = True
+ | isOutOfBound row col = False
+ | board !! row !! col == '*' = False
+ | board !! row !! col == player = True
  | otherwise = plaYable player board (fRow row) (fCol col) fRow fCol
 
 
@@ -135,7 +148,86 @@ boardFull (h:t)
 anyOpen ::[Char] -> Bool
 anyOpen row = or [x == '*'| x <- row]
 
--- check if board is full}
+-- check if board is full
+createCoordinate lst lst1 =  [(x,y)| x <- lst, y <- lst1]
+-- createAllMoves = 
+show_board board= putStr (unlines [unwords [show (board !! y !! x) | x <- [0..7]] | y <- [0..7]])
+
+reversi_start = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
+                       ['*', '*', '*', '*', '*', '*', '*', '*'],
+                       ['*', '*', '*', '*', '*', '*', '*', '*'],
+                       ['*', '*', '*', 'O', 'X', '*', '*', '*'],
+                       ['*', '*', '*', 'X', 'O', '*', '*', '*'],
+                       ['*', '*', '*', '*', '*', '*', '*', '*'],
+                       ['*', '*', '*', '*', '*', '*', '*', '*'],
+                       ['*', '*', '*', '*', '*', '*', '*', '*']] (0, 0, 'X', 'O')
+
+ -- a i = Action i
+-- reversi  (Action (5 5)) reversi_start 
+
+test_board = [['*', '*', '*', '*', '*', '*', '*', '*'], 
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', 'X', '*'],
+    ['*', '*', '*', 'O', 'X', 'O', 'O', '*'],
+    ['*', '*', '*', 'X', 'O', 'O', 'X', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']]
+
+test_State = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', 'X', '*'],
+    ['*', '*', '*', 'O', 'X', 'O', 'O', '*'],
+    ['*', '*', '*', 'X', 'O', 'O', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']] (3, 5, 'X', 'O')
+
+-- a i = Action i
+-- updateBoard (a (4,6)) test_State  
+-- returns State ["********","********","******X*","***OXOX*","***XXXX*","********","********","********"] (2,7,'O','X')
+
+test_end = 
+--        0    1    2    3    4    5    6    7
+{-0-}  [['.', '.', '.', '.', 'O', '.', '.', '.'], 
+{-1-}   ['.', '.', '.', '.', 'O', 'O', '.', '.'],
+{-2-}   ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'X'],
+{-3-}   ['.', '.', 'O', 'O', 'O', 'O', '.', 'X'],
+{-4-}   ['.', '.', 'O', 'O', 'O', '.', '.', 'X'],
+{-5-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
+{-6-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
+{-7-}   ['.', '.', '.', '.', '.', '.', '.', '.']]
+
+test_end_star = 
+   [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+    ['*', '*', 'X', 'X', 'X', 'X', '*', 'O'],
+    ['*', '*', 'X', 'X', 'X', '*', '*', 'O'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']]
+
+brd = 
+   [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+    ['X', 'X', 'X', 'X', 'X', 'X', '*', 'O'],
+    ['X', 'X', 'X', 'X', 'X', '*', '*', 'O'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']]
+
+test_end_State = 
+   State [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+    ['*', '*', 'X', 'X', 'X', 'X', '*', 'O'],
+    ['*', '*', 'X', 'X', 'X', '*', '*', 'O'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']] (17, 3, 'X','O')
 
 
+-- to test this change 
 

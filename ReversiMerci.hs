@@ -29,11 +29,12 @@ type Board = [[Char]]  -- (self,other)
 reversi :: Game 
 reversi (Action (row,col)) (State board (mine, opp, player, other))
  | win board mine opp player other = EndOfGame player reversi_start
- | boardFull board && mine == opp = EndOfGame 't' reversi_start
+ | row == 8 && col == 8 = EndOfGame other reversi_start
+ | boardFull board && mine == opp = EndOfGame 't' reversi_start 
  | otherwise = ContinueGame (updateBoard (row,col) (State board (mine, opp, player, other)))
 
  -- reversi (a (2,3)) test_end_State  
- --reversi (a (2,3)) reversi_start 
+ --reversi (a (2,3)) reversi_start
 
 
 -- updates the board
@@ -68,12 +69,13 @@ updateBoardWithPlay board row col player other =
 
 updateFollowUp :: Board -> Int -> Int -> Player -> Player -> (Int -> Int) -> (Int -> Int) -> Board
 updateFollowUp board row col player other fRow fCol
- | (checkBoard player other board row col fRow fCol) = flipMerci board player row col fRow fCol -- horizontal right
+ | (checkBoard player other board row col fRow fCol) = flipMerci board player (fRow row) (fCol col) fRow fCol -- horizontal right
  | otherwise = board
 
 flipMerci :: Board -> Player -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Board
 flipMerci board player row col fRow fCol
- | (isOutOfBound row col) || (board !! row !! col) == '*' = board
+ -- | (isOutOfBound row col) || (board !! row !! col) == '.' || (board !! row !! col) == player = board
+ | (isOutOfBound row col) || (board !! row !! col) == '*' || (board !! row !! col) == player = board
  | otherwise = flipMerci (replaceNth1 row col player board) player (fRow row) (fCol col) fRow fCol
 
 replaceNth1 :: Int -> Int -> a -> [[a]] -> [[a]]
@@ -91,9 +93,10 @@ replaceNth n newVal (x:xs)
 -- a player wins if they have more points than the other player and neither plauer has any valid moves left
 win :: Board -> Int -> Int -> Player -> Player -> Bool
 win board mine opp player other
- | boardFull board && mine > opp = True
- | noValidMoves board (createCoordinate [0..7] [0..7]) player other && noValidMoves board (createCoordinate [0..7] [0..7]) other player  && mine > opp = True
+ | boardFull board && newMine > newOpp = True
+ | noValidMoves board (createCoordinate [0..7] [0..7]) player other && noValidMoves board (createCoordinate [0..7] [0..7]) other player  && newMine > newOpp = True
  | otherwise = False
+   where (newMine, newOpp) = count board
  -- win test_end_star 5 4 'X' 'O' 
 
 
@@ -112,6 +115,7 @@ valid (row, col) board player other =
  (checkPlay player other board row col (\ i -> i+1) (\ j -> j) (\ i -> i-1) (\j -> j)) || -- check Vertical 
  (checkPlay player other board row col (\ i -> i-1) (\ j -> j-1) (\ i -> i+1) (\j -> j+1)) || -- check diagnal up
  (checkPlay player other board row col (\ i -> i+1) (\ j -> j-1) (\ i -> i-1) (\j -> j+1))) &&  -- check diagnal down
+ -- (board !! row !! col) == '.'
  (board !! row !! col) == '*'
 
 -- helper for valid
@@ -129,6 +133,7 @@ checkBoard player other board row col fRow fCol
 plaYable :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 plaYable player board row col fRow fCol
  | isOutOfBound row col = False
+ -- | board !! row !! col == '.' = False
  | board !! row !! col == '*' = False
  | board !! row !! col == player = True
  | otherwise = plaYable player board (fRow row) (fCol col) fRow fCol
@@ -147,23 +152,64 @@ boardFull (h:t)
 
 anyOpen ::[Char] -> Bool
 anyOpen row = or [x == '*'| x <- row]
+-- anyOpen row = or [x == '.'| x <- row]
+
+returnValidMove :: [(Int, Int)] -> Board -> Player -> Player -> (Int, Int)
+returnValidMove [] _ _ _ = (8,8)
+returnValidMove (h:t) board player other
+ | valid h board player other = h
+ | otherwise = returnValidMove t board player other
+
+printState (ContinueGame (State board (mine, opp, player, other))) = show_board board
+printState1 (State board (mine, opp, player, other)) = show_board board
+
+
+-- Simple Player ---
+simple_player :: State -> Result
+simple_player (State board (mine, opp, player, other))
+ | noValidMoves board (createCoordinate [0..7] [0..7]) player other = ContinueGame (State board (opp, mine, other, player))
+ | otherwise = reversi (Action (row, col)) (State board (mine, opp, player, other))
+    where (row, col) = returnValidMove (createCoordinate [0..7] [0..7]) board player other
+ 
 
 -- check if board is full
 createCoordinate lst lst1 =  [(x,y)| x <- lst, y <- lst1]
 -- createAllMoves = 
 show_board board= putStr (unlines [unwords [show (board !! y !! x) | x <- [0..7]] | y <- [0..7]])
 
-reversi_start = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
-                       ['*', '*', '*', '*', '*', '*', '*', '*'],
-                       ['*', '*', '*', '*', '*', '*', '*', '*'],
-                       ['*', '*', '*', 'O', 'X', '*', '*', '*'],
-                       ['*', '*', '*', 'X', 'O', '*', '*', '*'],
-                       ['*', '*', '*', '*', '*', '*', '*', '*'],
-                       ['*', '*', '*', '*', '*', '*', '*', '*'],
-                       ['*', '*', '*', '*', '*', '*', '*', '*']] (0, 0, 'X', 'O')
+-- reversi_start = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
+--                        ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                        ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                        ['*', '*', '*', 'O', 'X', '*', '*', '*'],
+--                        ['*', '*', '*', 'X', 'O', '*', '*', '*'],
+--                        ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                        ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                        ['*', '*', '*', '*', '*', '*', '*', '*']] (0, 0, 'X', 'O')
+
+
+reversi_start = State 
+   [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+    ['X', 'X', 'X', 'X', 'X', 'X', '*', 'O'],
+    ['*', 'X', 'X', 'O', '*', '*', '*', 'O'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*'],
+    ['*', '*', '*', '*', '*', '*', '*', '*']] (16, 3, 'X', 'O')
+
+-- reversi_start = 
+-- --              0    1    2    3    4    5    6    7
+-- {-0-}  State [['.', '.', '.', '.', 'O', '.', '.', '.'], 
+-- {-1-}         ['.', '.', '.', '.', 'O', 'O', '.', '.'],
+-- {-2-}         ['O', 'O', 'O', 'O', 'X', '.', 'O', 'X'],
+-- {-3-}         ['.', '.', 'O', 'O', 'O', 'O', '.', 'X'],
+-- {-4-}         ['.', '.', 'O', 'O', 'O', '.', '.', 'X'],
+-- {-5-}         ['.', '.', '.', '.', '.', '.', '.', '.'],
+-- {-6-}         ['.', '.', '.', '.', '.', '.', '.', '.'],
+-- {-7-}         ['.', '.', '.', '.', '.', '.', '.', '.']] (0, 0, 'O', 'X')
 
  -- a i = Action i
--- reversi  (Action (5 5)) reversi_start 
+-- reversi  (Action (5 5)) reversi_start
 
 test_board = [['*', '*', '*', '*', '*', '*', '*', '*'], 
     ['*', '*', '*', '*', '*', '*', '*', '*'],
@@ -198,6 +244,17 @@ test_end =
 {-6-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
 {-7-}   ['.', '.', '.', '.', '.', '.', '.', '.']]
 
+-- reversi_start = 
+-- --        0    1    2    3    4    5    6    7
+-- {-0-}  State [['.', '.', '.', '.', 'O', '.', '.', '.'], 
+-- {-1-}   ['.', '.', '.', '.', 'O', 'O', '.', '.'],
+-- {-2-}   ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'X'],
+-- {-3-}   ['.', '.', 'O', 'O', 'O', 'O', '.', 'X'],
+-- {-4-}   ['.', '.', 'O', 'O', 'O', '.', '.', 'X'],
+-- {-5-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
+-- {-6-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
+-- {-7-}   ['.', '.', '.', '.', '.', '.', '.', '.']] (0, 0, 'X', 'O')
+
 test_end_star = 
    [['*', '*', '*', '*', 'X', '*', '*', '*'], 
     ['*', '*', '*', '*', 'X', 'X', '*', '*'],
@@ -207,6 +264,16 @@ test_end_star =
     ['*', '*', '*', '*', '*', '*', '*', '*'],
     ['*', '*', '*', '*', '*', '*', '*', '*'],
     ['*', '*', '*', '*', '*', '*', '*', '*']]
+
+test_update = 
+    State [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+           ['*', '*', '*', '*', 'O', 'X', '*', '*'],
+           ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+           ['*', '*', 'X', 'X', 'X', 'X', '*', 'O'],
+           ['*', '*', 'X', 'X', 'X', '*', '*', 'O'],
+           ['*', '*', '*', '*', '*', '*', '*', '*'],
+           ['*', '*', '*', '*', '*', '*', '*', '*'],
+           ['*', '*', '*', '*', '*', '*', '*', '*']] (17, 3, 'O','X')
 
 brd = 
    [['*', '*', '*', '*', 'X', '*', '*', '*'], 

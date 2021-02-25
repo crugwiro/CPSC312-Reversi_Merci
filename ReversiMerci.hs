@@ -24,14 +24,24 @@ type Board = [[Char]]  -- (self,other)
 -- type InternalState = (Int,Int, Char, Char)
 
 
+check_winner s1 s2 p1 p2 
+    |s1 == s2 = 't'
+    |s1 > s2 = p1
+    |otherwise = p2
 
 
 reversi :: Game 
 reversi (Action (row,col)) (State board (mine, opp, player, other))
- | win board mine opp player other = EndOfGame player reversi_start
- | row == 8 && col == 8 = EndOfGame other reversi_start
- | boardFull board && mine == opp = EndOfGame 't' reversi_start 
- | otherwise = ContinueGame (updateBoard (row,col) (State board (mine, opp, player, other)))
+ | win board mine opp player other = EndOfGame (check_winner mine opp player other) reversi_start
+ | row == 8 && col == 8 = EndOfGame (check_winner mine opp player other) reversi_start
+ | valid (row,col) board player other = 
+    let State new_board (int1,int2, char1, char2) = (updateBoard (row,col) (State board (mine, opp, player, other))) 
+    in if win new_board int1 int2 char1 char2 
+        then EndOfGame (check_winner mine opp player other) reversi_start 
+        else if (noValidMoves new_board (createCoordinate [0..7] [0..7]) char1 char2) -- if the next player has no more moves continue with current
+        then ContinueGame (State new_board (int2, int1, char2, char1))
+        else ContinueGame (State new_board (int1,int2, char1, char2))
+ | otherwise = ContinueGame (State board (mine, opp, player, other))
 
  -- reversi (a (2,3)) test_end_State  
  --reversi (a (2,3)) reversi_start
@@ -94,7 +104,7 @@ replaceNth n newVal (x:xs)
 win :: Board -> Int -> Int -> Player -> Player -> Bool
 win board mine opp player other
  | boardFull board && newMine > newOpp = True
- | noValidMoves board (createCoordinate [0..7] [0..7]) player other && noValidMoves board (createCoordinate [0..7] [0..7]) other player  && newMine > newOpp = True
+ | noValidMoves board (createCoordinate [0..7] [0..7]) player other && noValidMoves board (createCoordinate [0..7] [0..7]) other player = True
  | otherwise = False
    where (newMine, newOpp) = count board
  -- win test_end_star 5 4 'X' 'O' 
@@ -116,7 +126,7 @@ valid (row, col) board player other =
  (checkPlay player other board row col (\ i -> i-1) (\ j -> j-1) (\ i -> i+1) (\j -> j+1)) || -- check diagnal up
  (checkPlay player other board row col (\ i -> i+1) (\ j -> j-1) (\ i -> i-1) (\j -> j+1))) &&  -- check diagnal down
  -- (board !! row !! col) == '.'
- (board !! row !! col) == '*'
+ (board !! row !! col) == '*' 
 
 -- helper for valid
 checkPlay :: Char -> Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> Bool
@@ -178,25 +188,26 @@ createCoordinate lst lst1 =  [(x,y)| x <- lst, y <- lst1]
 show_board board= putStr (unlines [unwords [show (board !! y !! x) | x <- [0..7]] | y <- [0..7]])
 
 -- reversi_start = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
---                        ['*', '*', '*', '*', '*', '*', '*', '*'],
---                        ['*', '*', '*', '*', '*', '*', '*', '*'],
---                        ['*', '*', '*', 'O', 'X', '*', '*', '*'],
---                        ['*', '*', '*', 'X', 'O', '*', '*', '*'],
---                        ['*', '*', '*', '*', '*', '*', '*', '*'],
---                        ['*', '*', '*', '*', '*', '*', '*', '*'],
---                        ['*', '*', '*', '*', '*', '*', '*', '*']] (0, 0, 'X', 'O')
+--                         ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                         ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                         ['*', '*', '*', 'O', 'X', '*', '*', '*'],
+--                         ['*', '*', '*', 'X', 'O', '*', '*', '*'],
+--                         ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                         ['*', '*', '*', '*', '*', '*', '*', '*'],
+--                         ['*', '*', '*', '*', '*', '*', '*', '*']] (2, 2, 'X', 'O')
 
 
-reversi_start = State 
-   [['*', '*', '*', '*', 'X', '*', '*', '*'], 
-    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
-    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
-    ['X', 'X', 'X', 'X', 'X', 'X', '*', 'O'],
-    ['*', 'X', 'X', 'O', '*', '*', '*', 'O'],
-    ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*']] (16, 3, 'X', 'O')
-
+-- reversi_start = State 
+--   [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+--    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+--    ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+--    ['X', 'X', 'X', 'X', 'X', 'X', '*', 'O'],
+--    ['*', 'X', 'X', 'O', '*', '*', '*', 'O'],
+--    ['*', '*', '*', '*', '*', '*', '*', '*'],
+--    ['*', '*', '*', '*', '*', '*', '*', '*'],
+--    ['*', '*', '*', '*', '*', '*', '*', '*']] (16, 3, 'X', 'O')
+    
+    
 -- reversi_start = 
 -- --              0    1    2    3    4    5    6    7
 -- {-0-}  State [['.', '.', '.', '.', 'O', '.', '.', '.'], 
@@ -206,19 +217,21 @@ reversi_start = State
 -- {-4-}         ['.', '.', 'O', 'O', 'O', '.', '.', 'X'],
 -- {-5-}         ['.', '.', '.', '.', '.', '.', '.', '.'],
 -- {-6-}         ['.', '.', '.', '.', '.', '.', '.', '.'],
--- {-7-}         ['.', '.', '.', '.', '.', '.', '.', '.']] (0, 0, 'O', 'X')
+-- {-7-}         ['.', '.', '.', '.', '.', '.', '.', '.']] (15, 4, 'O', 'X')
 
  -- a i = Action i
 -- reversi  (Action (5 5)) reversi_start
 
-test_board = [['*', '*', '*', '*', '*', '*', '*', '*'], 
-    ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', 'X', '*'],
-    ['*', '*', '*', 'O', 'X', 'O', 'O', '*'],
-    ['*', '*', '*', 'X', 'O', 'O', 'X', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*']]
+test_board = 
+--      0    1    2    3    4    5    6    7    
+{-0-}[['*', '*', '*', '*', '*', '*', '*', '*'], 
+{-1 -}['*', '*', '*', '*', '*', '*', '*', '*'],
+{-2 -}['*', '*', '*', '*', '*', '*', 'X', '*'],
+{-3 -}['*', '*', '*', 'O', 'X', 'O', 'O', '*'],
+{-4 -}['*', '*', '*', 'X', 'O', 'O', 'X', '*'],
+{-5 -}['*', '*', '*', '*', '*', '*', '*', '*'],
+{-6 -}['*', '*', '*', '*', '*', '*', '*', '*'],
+{-7 -}['*', '*', '*', '*', '*', '*', '*', '*']]
 
 test_State = State [['*', '*', '*', '*', '*', '*', '*', '*'], 
     ['*', '*', '*', '*', '*', '*', '*', '*'],
@@ -253,7 +266,7 @@ test_end =
 -- {-4-}   ['.', '.', 'O', 'O', 'O', '.', '.', 'X'],
 -- {-5-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
 -- {-6-}   ['.', '.', '.', '.', '.', '.', '.', '.'],
--- {-7-}   ['.', '.', '.', '.', '.', '.', '.', '.']] (0, 0, 'X', 'O')
+-- {-7-}   ['.', '.', '.', '.', '.', '.', '.', '.']] (3, 17, 'X', 'O')
 
 test_end_star = 
    [['*', '*', '*', '*', 'X', '*', '*', '*'], 
@@ -285,16 +298,47 @@ brd =
     ['*', '*', '*', '*', '*', '*', '*', '*'],
     ['*', '*', '*', '*', '*', '*', '*', '*']]
 
-test_end_State = 
-   State [['*', '*', '*', '*', 'X', '*', '*', '*'], 
-    ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+-- reversi_start = 
+--    State [['*', '*', '*', '*', 'X', '*', '*', '*'], 
+--     ['*', '*', '*', '*', 'X', 'X', '*', '*'],
+--     ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
+--     ['*', '*', 'X', 'X', 'X', 'X', '*', 'O'],
+--     ['*', '*', 'X', 'O', '*', '*', '*', 'O'],
+--     ['*', '*', '*', '*', '*', '*', '*', '*'],
+--     ['*', '*', '*', '*', '*', '*', '*', '*'],
+--     ['*', '*', '*', '*', '*', '*', '*', '*']] (17, 3, 'X','O')
+
+reversi_start = 
+   State [['*', '*', '*', '*', 'X', '*', '*', 'X'], 
+    ['*', '*', '*', '*', 'X', 'X', '*', 'X'],
     ['X', 'X', 'X', 'X', 'X', 'X', 'X', 'O'],
     ['*', '*', 'X', 'X', 'X', 'X', '*', 'O'],
-    ['*', '*', 'X', 'X', 'X', '*', '*', 'O'],
+    ['*', '*', 'X', 'O', '*', '*', '*', 'O'],
     ['*', '*', '*', '*', '*', '*', '*', '*'],
     ['*', '*', '*', '*', '*', '*', '*', '*'],
-    ['*', '*', '*', '*', '*', '*', '*', '*']] (17, 3, 'X','O')
+    ['*', '*', '*', '*', '*', '*', '*', '*']] (17, 3, 'X','O')    
 
+test_skip_board = 
+--        0    1    2    3    4    5    6    7
+{-0-}  [['*', '*', '*', '*', '*', '*', '*', '*'], 
+{-1-}   ['*', '*', '*', '*', 'O', 'O', '*', '*'],
+{-2-}   ['O', 'O', 'O', 'O', 'O', 'O', 'O', '*'],
+{-3-}   ['*', '*', 'O', 'O', 'O', 'O', '*', 'O'],
+{-4-}   ['*', '*', 'O', 'O', 'O', '*', '*', 'X'],
+{-5-}   ['*', '*', '*', '*', '*', '*', '*', '*'],
+{-6-}   ['*', '*', '*', '*', '*', '*', '*', '*'],
+{-7-}   ['*', '*', '*', '*', '*', '*', '*', '*']]-- to test this change 
 
--- to test this change 
+-- reversi_start = 
+-- -- test_State_skip = 
+-- --        0    1    2    3    4    5    6    7
+-- {-0-}  State [['*', '*', '*', '*', '*', '*', '*', 'O'], 
+-- {-1-}   ['*', '*', '*', '*', 'O', 'O', '*', 'O'],
+-- {-2-}   ['O', 'O', 'O', 'O', 'O', 'O', 'O', 'O'],
+-- {-3-}   ['*', '*', 'O', 'O', 'O', 'O', '*', 'O'],
+-- {-4-}   ['*', '*', 'O', 'O', 'X', '*', '*', 'X'],
+-- {-5-}   ['*', '*', '*', '*', '*', '*', '*', '*'],
+-- {-6-}   ['*', '*', '*', '*', '*', '*', '*', '*'],
+-- {-7-}   ['*', '*', '*', '*', '*', '*', '*', '*']] (1, 17, 'O', 'X')
 
+--reversi_start = (State test_skip_board (1,17,'X','O'))

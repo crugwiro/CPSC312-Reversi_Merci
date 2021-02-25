@@ -63,15 +63,6 @@ person_play game (ContinueGame state) opponent ts opp_type =
       putStrLn ("current player: "++show char1)
       putStrLn ("score ("++show char1++","++show char2++"): ("++show int1++","++show int2++")")
       do 
-        -- let valid_moves = list_valid_moves state
-        -- if length valid_moves == 0
-        --   then 
-        --     do 
-        --       putStrLn ("No Valid move, skipping your turn")
-        --       -- putStrLn ("score ("++show char1++","++show char2++"): ("++show int1++","++show int2++")")
-        --       if opp_type=="pvcomp"then computer_play game (game (Action (rowline, colline)) state) opponent ts opp_type  
-        --         else person_play game (game (Action (rowline, colline)) state) opponent ts opp_type
-        -- else do
         rowline <- get_num_ans "choose a row: "
         colline <- get_num_ans "choose a column: "
         if opp_type=="pvcomp"
@@ -96,11 +87,9 @@ computer_play game (ContinueGame state) opponent ts opp_type =
         in
             if (opp_type=="pvcomp") && (char1 /= 'O') -- make sure person played valid move and players have switched since it's person vs comp, computer is always second so it will be O
             then person_play game (ContinueGame state) opponent ts opp_type
-            -- then person_play game (game next_move state) opponent ts opp_type
             else 
             do
                 putStrLn ("The computer chose "++show next_move)
-                -- person_play game (game next_move state) opponent ts opp_type
                 person_play game (game next_move state) opponent ts opp_type
 
 
@@ -127,13 +116,10 @@ update_status:: Char -> CurrentGameStatus -> IO CurrentGameStatus
 update_status val (x_wins,o_wins,ties)
   | val == 'X' = do
       putStrLn "X Won"
-      putStrLn "Merci :) "
       return (x_wins+1, o_wins,ties)
   | val == 't' = do
       putStrLn "It's a tie"
-      putStrLn "Merci :)"
       return (x_wins, o_wins,ties+1)
   | otherwise = do
       putStrLn "O won!"
-      putStrLn "Merci :)"
       return (x_wins, o_wins+1,ties)

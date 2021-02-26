@@ -47,13 +47,7 @@ play game start_state opponent ts =
         then
             person_play game (ContinueGame reversi_start) opponent ts "pvp"
         else if line ==  "1"
-             then 
-              do 
-                putStrLn "Choose level: 0=Begginer, 1=Advanced"
-                level <- getLine
-                if level == "1"
-                  then person_play game (ContinueGame reversi_start) opponent ts "pvcomp" 
-                  else person_play game (ContinueGame reversi_start) opponent ts "pvcompB"
+             then person_play game (ContinueGame reversi_start) opponent ts "pvcomp" 
         else if line == "2"
             then return ts
         else play game reversi_start opponent ts
@@ -72,9 +66,7 @@ person_play game (ContinueGame state) opponent ts opp_type =
         rowline <- get_num_ans "choose a row: "
         colline <- get_num_ans "choose a column: "
         if opp_type=="pvcomp"
-            then computer_play game (game (Action (rowline, colline)) state) opponent ts opp_type
-            else if opp_type == "pvcompB"
-            then   computer_playB game (game (Action (rowline, colline)) state) opponent ts opp_type
+            then computer_play game (game (Action (rowline, colline)) state) opponent ts opp_type  
         else person_play game (game (Action (rowline, colline)) state) opponent ts opp_type
         
 person_play game (EndOfGame val start_state) opponent ts opp_type =
@@ -92,7 +84,6 @@ computer_play game (ContinueGame state) opponent ts opp_type =
       let 
           State board (int1,int2, char1, char2)  = state
           next_move = (Action (choose_best state))
-          -- next_moveB = (Action (returnValidMove (createCoordinate [0..7] [0..7]) board char1 char2))
         in
             if (opp_type=="pvcomp") && (char1 /= 'O') -- make sure person played valid move and players have switched since it's person vs comp, computer is always second so it will be O
             then person_play game (ContinueGame state) opponent ts opp_type
@@ -101,23 +92,7 @@ computer_play game (ContinueGame state) opponent ts opp_type =
                 putStrLn ("The computer chose "++show next_move)
                 person_play game (game next_move state) opponent ts opp_type
 
-computer_playB game (EndOfGame val  start_state) opponent ts opp_type =
-   do
-      newts <- update_status val ts
-      play game start_state opponent newts
 
-computer_playB game (ContinueGame state) opponent ts opp_type =
-      let 
-          State board (int1,int2, char1, char2)  = state
-          -- next_move = (Action (choose_best state))
-          next_moveB = (Action (returnValidMove (createCoordinate [0..7] [0..7]) board char1 char2))
-        in
-            if (opp_type=="pvcompB") && (char1 /= 'O') -- make sure person played valid move and players have switched since it's person vs comp, computer is always second so it will be O
-            then person_play game (ContinueGame state) opponent ts opp_type
-            else 
-            do
-                putStrLn ("The computer chose "++show next_moveB)
-                person_play game (game next_moveB state) opponent ts opp_type
 
 --list all valid moves for current player
 --list_valid_moves test_State => [(2,3),(3,2),(3,7),(4,6),(5,3),(5,4),(5,6)]

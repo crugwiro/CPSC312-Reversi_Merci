@@ -4,10 +4,15 @@ import ReversiMerci
 
 import System.IO
 import Data.Time.Clock
-import Text.Read   (readMaybe)
+import Text.Read (readMaybe)
 
 --to play
 -- play reversi reversi_start 'X' (0,0,0)
+
+--given a player, return the opposite player
+switch_player c
+    |c=='X' = 'O'
+    |otherwise = 'X'
 
 --get user input and check that they've given an Int
 get_ans :: Read b => String -> IO b
@@ -59,11 +64,11 @@ play game start_state opponent ts =
                 putStrLn "Choose level: 0=Beginner, 1= Intermediate, 2 = Advanced"
                 level <- getLine
                 if level == "1"
-                  then person_play game (ContinueGame reversi_start) opponent ts "pvcomp" 
+                  then person_play game (ContinueGame reversi_start) 'X' ts "pvcomp" 
                   else if level == "2"
-                    then person_play game (ContinueGame reversi_start) opponent ts "pvcompH" 
+                    then person_play game (ContinueGame reversi_start) 'X' ts "pvcompH" 
                   else 
-                    person_play game (ContinueGame reversi_start) opponent ts "pvcompB"
+                    person_play game (ContinueGame reversi_start) 'X' ts "pvcompB"
         else if line == "2"
             then return ts
         else play game reversi_start opponent ts
@@ -79,39 +84,49 @@ person_play game (ContinueGame state) opponent ts opp_type =
       let time = 30
       currTime <- getCurrentTime  --variable to instantiate original time
       let State board (int1,int2, char1, char2)  = state
-      show_numbered_board board
-      putStrLn ("current player: "++show char1)
-      putStrLn ("score ("++show char1++","++show char2++"): ("++show int1++","++show int2++")")
-      do 
-        rowline <- get_num_ans "choose a row: "
-        colline <- get_num_ans "choose a column: "
-        currTimeNew <- getCurrentTime  
-        if opp_type=="pvcomp" || opp_type == "pvcompH"
-            then 
-                if diffUTCTime currTimeNew currTime >=  time
-                    then 
-                    do 
-                        putStrLn "You took too long to make your move..it is now your opponent's turn"
-                        computer_play game (ContinueGame (State board (int2, int1, char2, char1))) opponent ts opp_type
-                    else 
-                    computer_play game (game (Action (rowline, colline)) state) opponent ts opp_type
-            else if opp_type == "pvcompB"
-                then  
+      
+      if  char1 /= opponent 
+        then
+        do
+            if opp_type == "pvcompB" 
+            then computer_playB game (ContinueGame state) (switch_player opponent) ts opp_type
+            else if opp_type == "pvcomp" then computer_play game (ContinueGame state) (switch_player opponent) ts opp_type
+            else if opp_type == "pvcompH" then computer_play game (ContinueGame state) (switch_player opponent) ts opp_type
+            else person_play game (ContinueGame state) (switch_player opponent) ts opp_type
+        else
+          do
+            show_numbered_board board
+            putStrLn ("current player: "++show char1)
+            putStrLn ("score ("++show char1++","++show char2++"): ("++show int1++","++show int2++")")
+            rowline <- get_num_ans "choose a row: "
+            colline <- get_num_ans "choose a column: "
+            currTimeNew <- getCurrentTime  
+            if opp_type=="pvcomp" || opp_type == "pvcompH"
+                then 
                     if diffUTCTime currTimeNew currTime >=  time
                         then 
                         do 
                             putStrLn "You took too long to make your move..it is now your opponent's turn"
-                            computer_playB game (ContinueGame (State board (int2, int1, char2, char1))) opponent ts opp_type 
-                        else
-                            computer_playB game (game (Action (rowline, colline)) state) opponent ts opp_type
-            else 
-                if diffUTCTime currTimeNew currTime >=  time 
-                    then 
-                    do 
-                        putStrLn "You took too long to make your move..it is now your opponent's turn"
-                        person_play game (ContinueGame (State board (int2, int1, char2, char1))) opponent ts opp_type
-                    else 
-                        person_play game (game (Action (rowline, colline)) state) opponent ts opp_type
+                            computer_play game (ContinueGame (State board (int2, int1, char2, char1))) char2 ts opp_type
+                        else 
+                        computer_play game (game (Action (rowline, colline)) state) (switch_player opponent) ts opp_type
+                else if opp_type == "pvcompB"
+                    then  
+                        if diffUTCTime currTimeNew currTime >=  time
+                            then 
+                            do 
+                                putStrLn "You took too long to make your move..it is now your opponent's turn"
+                                computer_playB game (ContinueGame (State board (int2, int1, char2, char1))) char2 ts opp_type 
+                            else
+                                computer_playB game (game (Action (rowline, colline)) state) (switch_player opponent) ts opp_type
+                else 
+                    if diffUTCTime currTimeNew currTime >=  time 
+                        then 
+                        do 
+                            putStrLn "You took too long to make your move..it is now your opponent's turn"
+                            person_play game (ContinueGame (State board (int2, int1, char2, char1))) opponent ts opp_type
+                        else 
+                            person_play game (game (Action (rowline, colline)) state) (switch_player opponent) ts opp_type
         
 person_play game (EndOfGame val start_state) opponent ts opp_type =
   do
@@ -139,8 +154,7 @@ computer_play game (ContinueGame state) opponent ts opp_type =
             else
             do
                 putStrLn ("The computer chose "++show next_move)
-                person_play game (game next_move state) opponent ts opp_type
-
+                person_play game (game next_move state) (switch_player opponent) ts opp_type
 
 
 --computer_playB is the easiest computer player, it chooses a valid move randomly
@@ -161,7 +175,7 @@ computer_playB game (ContinueGame state) opponent ts opp_type =
             else 
             do
                 putStrLn ("The computer chose "++show next_moveB)
-                person_play game (game next_moveB state) opponent ts opp_type
+                person_play game (game next_moveB state) (switch_player opponent) ts opp_type
 
 
 --list all valid moves for current player
@@ -212,7 +226,7 @@ choose_best state opp_type =
 update_status:: Char -> CurrentGameStatus -> IO CurrentGameStatus
 update_status val (x_wins,o_wins,ties)
   | val == 'X' = do
-      putStrLn "X Won"
+      putStrLn "X Won!"
       putStrLn "Merci for the Reversi"
       return (x_wins+1, o_wins,ties)
   | val == 't' = do

@@ -13,14 +13,15 @@ type Player = Char
 
 data Action = Action (Int, Int)                  -- a move for a player is just an Int
          deriving (Ord,Eq, Show)                 -- a move for a player is just an Int
-type Board = [[Char]]  -- (self,other)
--- type InternalState = (Int,Int, Char, Char)
+type Board = [[Char]]  
+
 
 --return the winner of the game given the characters and scores from the state
 check_winner s1 s2 p1 p2 
     |s1 == s2 = 't'
     |s1 > s2 = p1
     |otherwise = p2
+
 
 -- main game
 -- takes a move and a state and updates the state with the action.
@@ -52,7 +53,7 @@ updateBoard (row,col) (State board (mine, opp, player, other)) =
         else 
             (State updatedBoard (newMine, newOpp, other, player))
 
--- count number of X and O values currently on the board
+--count number of X and Y values currently on the board
 count :: Board -> (Int,Int)
 count board = 
     let 
@@ -74,7 +75,6 @@ updateBoardWithPlay board row col player other =
         board8 = updateFollowUp board7 row col player other (\ i -> i - 1) (\ j -> j - 1)
     in (board8)
 
-
 -- Helper for updateBoardwithPlay
 updateFollowUp :: Board -> Int -> Int -> Player -> Player -> (Int -> Int) -> (Int -> Int) -> Board
 updateFollowUp board row col player other fRow fCol
@@ -84,8 +84,9 @@ updateFollowUp board row col player other fRow fCol
 -- flip opponents chips after valid play in a given direction
 flipMerci :: Board -> Player -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Board
 flipMerci board player row col fRow fCol
- | (isOutOfBound row col) || (board !! row !! col) == '*' || (board !! row !! col) == player = board
+ | (isOutOfBound row col) || (board !! row !! col) == '.' || (board !! row !! col) == player = board
  | otherwise = flipMerci (replaceNth1 row col player board) player (fRow row) (fCol col) fRow fCol
+
 
 -- replace a character in a 2D array
 -- calls replaceNth to update specific rows/cols
@@ -117,15 +118,15 @@ noValidMoves board (h:t) player other
  | otherwise = noValidMoves board t player other
 
 -- checks if a move is valid
-    -- checks if a player's move will flip at least one of the opp's player schip
-        -- checks if there is a valid play in all directions from given (row, col) position
+-- checks if a player's move will flip at least one of the opp's player schip
+-- checks if there is a valid play in all directions from given (row, col) position
 valid :: (Int, Int) -> Board -> Player -> Player -> Bool
 valid (row, col) board player other = 
  ((checkPlay player other board row col (\ i -> i) (\ j -> j+1) (\ i -> i) (\j -> j-1)) || -- check horizontal
  (checkPlay player other board row col (\ i -> i+1) (\ j -> j) (\ i -> i-1) (\j -> j)) || -- check Vertical 
  (checkPlay player other board row col (\ i -> i-1) (\ j -> j-1) (\ i -> i+1) (\j -> j+1)) || -- check diagnal up
  (checkPlay player other board row col (\ i -> i+1) (\ j -> j-1) (\ i -> i-1) (\j -> j+1))) &&  -- check diagnal down
- (board !! row !! col) == '*'
+ (board !! row !! col) == '.'
 
 -- helper for valid
 checkPlay :: Char -> Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> (Int -> Int) -> Bool
@@ -139,11 +140,11 @@ checkBoard player other board row col fRow fCol
  | otherwise = False
 
 -- Playable checks if in a given direction a play is valid
-    -- Returns true or false is a play is possible
+-- Returns true or false is a play is possible
 plaYable :: Char -> Board -> Int -> Int -> (Int -> Int) -> (Int -> Int) -> Bool
 plaYable player board row col fRow fCol
  | isOutOfBound row col = False
- | board !! row !! col == '*' = False
+ | board !! row !! col == '.' = False
  | board !! row !! col == player = True
  | otherwise = plaYable player board (fRow row) (fCol col) fRow fCol
 
@@ -159,9 +160,10 @@ boardFull (h:t)
  | otherwise = boardFull t
 
 --check if any open space in row
-    -- helper for checking if board is full
+-- helper for checking if board is full
 anyOpen ::[Char] -> Bool
-anyOpen row = or [x == '*'| x <- row]
+anyOpen row = or [x == '.'| x <- row]
+
 
 --takes a list of all coordinates and returns a vaid move
 returnValidMove :: [(Int, Int)] -> Board -> Player -> Player -> (Int, Int)
@@ -170,23 +172,20 @@ returnValidMove (h:t) board player other
  | valid h board player other = h
  | otherwise = returnValidMove t board player other
 
--- -- Simple Player ---
--- simple_player :: State -> Result
--- simple_player (State board (mine, opp, player, other))
---  | noValidMoves board (createCoordinate [0..7] [0..7]) player other = ContinueGame (State board (opp, mine, other, player))
---  | otherwise = reversi (Action (row, col)) (State board (mine, opp, player, other))
---     where (row, col) = returnValidMove (createCoordinate [0..7] [0..7]) board player other
  
--- createAllMoves = 
+-- create all moves 
 createCoordinate lst lst1 =  [(x,y)| x <- lst, y <- lst1]
 
-reversi_start = State  [['*', '*', '*', '*', '*', '*', '*', '*'], 
-                        ['*', '*', '*', '*', '*', '*', '*', '*'],
-                        ['*', '*', '*', '*', '*', '*', '*', '*'],
-                        ['*', '*', '*', 'O', 'X', '*', '*', '*'],
-                        ['*', '*', '*', 'X', 'O', '*', '*', '*'],
-                        ['*', '*', '*', '*', '*', '*', '*', '*'],
-                        ['*', '*', '*', '*', '*', '*', '*', '*'],
-                        ['*', '*', '*', '*', '*', '*', '*', '*']] (2, 2, 'X', 'O')
+reversi_start = State starting_board (2, 2, 'X', 'O')
+                        
+starting_board = [['.', '.', '.', '.', '.', '.', '.', '.'], 
+                ['.', '.', '.', '.', '.', '.', '.', '.'],
+                ['.', '.', '.', '.', '.', '.', '.', '.'],
+                ['.', '.', '.', 'O', 'X', '.', '.', '.'],
+                ['.', '.', '.', 'X', 'O', '.', '.', '.'],
+                ['.', '.', '.', '.', '.', '.', '.', '.'],
+                ['.', '.', '.', '.', '.', '.', '.', '.'],
+                ['.', '.', '.', '.', '.', '.', '.', '.']]
+
 
 

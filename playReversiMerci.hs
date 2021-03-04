@@ -52,6 +52,7 @@ play :: Game -> State -> Player -> CurrentGameStatus -> IO CurrentGameStatus
 play game start_state opponent ts =
   let (x_wins, o_wins,ties) = ts in
   do
+      putStrLn ("WARNING: This is a Timed Game, you have 30 seconds to make a move. Happy ReversiMerci")
       putStrLn ("Current Stats: "++ show x_wins++ " X wins "++show o_wins++" O wins "++show ties++" ties")
       putStrLn "What type of player? 0=person, 1=computer, 2=exit."
       line <- getLine
